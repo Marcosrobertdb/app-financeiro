@@ -4,14 +4,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>App Financeiro PRO</title>
+<title>App Financeiro V2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body{font-family:Arial;background:#0f172a;color:#fff;padding:15px}
 h1{text-align:center}
 .card{background:#1e293b;padding:15px;border-radius:10px;margin-bottom:10px}
-input{width:100%;padding:8px;margin-top:5px;border-radius:6px;border:none}
+input,select{width:100%;padding:8px;margin-top:5px;border-radius:6px;border:none}
 button{margin-top:8px;padding:10px;width:100%;border:none;border-radius:8px;background:#22c55e;color:#000;font-weight:bold}
 .alert{padding:10px;margin-top:10px;border-radius:8px;display:none}
 </style>
@@ -20,7 +20,12 @@ button{margin-top:8px;padding:10px;width:100%;border:none;border-radius:8px;back
 
 <body>
 
-<h1>📱 App Financeiro PRO</h1>
+<h1>📱 App Financeiro V2</h1>
+
+<div class="card">
+<h3>📅 Mês</h3>
+<select id="mes"></select>
+</div>
 
 <div class="card">
 <h3>💰 Receita Mensal</h3>
@@ -28,19 +33,26 @@ button{margin-top:8px;padding:10px;width:100%;border:none;border-radius:8px;back
 </div>
 
 <div class="card">
+<h3>⚔️ Dívida Inicial</h3>
+<input id="dividaInicial" type="number" value="40000">
+</div>
+
+<div class="card">
 <h3>📅 Ganho Diário</h3>
 <input id="ganho" type="number" placeholder="Valor do dia">
 <button onclick="addGanho()">Adicionar</button>
+<button onclick="resetMes()">Resetar mês</button>
 </div>
 
 <div class="card">
 <h3>📊 Status</h3>
 <p>Total mês: R$ <span id="total">0</span></p>
 <p>Meta diária: R$ <span id="meta">0</span></p>
+<p>Dívida restante: R$ <span id="dividaRestante">0</span></p>
 </div>
 
 <div class="card">
-<h3>💸 Distribuição automática</h3>
+<h3>💸 Distribuição</h3>
 <p>Dívida (70%): R$ <span id="dividaPago">0</span></p>
 <p>Investimento (30%): R$ <span id="invest">0</span></p>
 </div>
@@ -50,80 +62,113 @@ button{margin-top:8px;padding:10px;width:100%;border:none;border-radius:8px;back
 <canvas id="grafico"></canvas>
 
 <script>
-let dados = JSON.parse(localStorage.getItem('dados')) || [];
+const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+let dados = JSON.parse(localStorage.getItem('dadosV2')) || {};
+let mesAtual = new Date().getMonth();
 
-function salvar(){
- localStorage.setItem('dados', JSON.stringify(dados));
+function init(){
+ let select = document.getElementById('mes');
+ meses.forEach((m,i)=>{
+  let opt = document.createElement('option');
+  opt.value=i;
+  opt.innerText=m;
+  if(i===mesAtual) opt.selected=true;
+  select.appendChild(opt);
+ });
+
+ select.onchange = ()=>{
+  mesAtual = select.value;
+  atualizar();
+ };
+
+ atualizar();
 }
 
-function metaDia(){
- let receita = Number(document.getElementById('receita').value);
- let meta = receita / 26;
- document.getElementById('meta').innerText = meta.toFixed(2);
- return meta;
+function salvar(){
+ localStorage.setItem('dadosV2', JSON.stringify(dados));
+}
+
+function getDadosMes(){
+ if(!dados[mesAtual]) dados[mesAtual]=[];
+ return dados[mesAtual];
 }
 
 function addGanho(){
  let valor = Number(document.getElementById('ganho').value);
  if(!valor) return;
 
- dados.push(valor);
+ let lista = getDadosMes();
+ lista.push(valor);
  salvar();
 
- document.getElementById('ganho').value = '';
+ document.getElementById('ganho').value='';
  atualizar();
 }
 
+function resetMes(){
+ dados[mesAtual] = [];
+ salvar();
+ atualizar();
+}
+
+function metaDia(){
+ let receita = Number(document.getElementById('receita').value);
+ let meta = receita/26;
+ document.getElementById('meta').innerText = meta.toFixed(2);
+ return meta;
+}
+
 function atualizar(){
- let total = dados.reduce((a,b)=>a+b,0);
+ let lista = getDadosMes();
+ let total = lista.reduce((a,b)=>a+b,0);
+
  document.getElementById('total').innerText = total.toFixed(2);
 
  let meta = metaDia();
- let media = dados.length ? total / dados.length : 0;
+ let media = lista.length ? total/lista.length : 0;
 
  let alerta = document.getElementById('alerta');
 
  if(media < meta){
-  alerta.style.display = 'block';
-  alerta.style.background = '#ef4444';
-  alerta.innerText = '⚠️ Abaixo da meta';
+  alerta.style.display='block';
+  alerta.style.background='#ef4444';
+  alerta.innerText='⚠️ Abaixo da meta';
  } else {
-  alerta.style.display = 'block';
-  alerta.style.background = '#22c55e';
-  alerta.innerText = '✅ Acima da meta';
+  alerta.style.display='block';
+  alerta.style.background='#22c55e';
+  alerta.innerText='✅ Acima da meta';
  }
 
- // divisão automática
- let divida = total * 0.7;
+ let dividaInicial = Number(document.getElementById('dividaInicial').value);
+
+ let pago = total * 0.7;
  let invest = total * 0.3;
 
- document.getElementById('dividaPago').innerText = divida.toFixed(2);
- document.getElementById('invest').innerText = invest.toFixed(2);
+ let restante = dividaInicial - pago;
+ if(restante < 0) restante = 0;
 
- grafico();
+ document.getElementById('dividaPago').innerText = pago.toFixed(2);
+ document.getElementById('invest').innerText = invest.toFixed(2);
+ document.getElementById('dividaRestante').innerText = restante.toFixed(2);
+
+ grafico(lista);
 }
 
 let chart;
 
-function grafico(){
+function grafico(lista){
  if(chart) chart.destroy();
 
  chart = new Chart(document.getElementById('grafico'),{
   type:'line',
   data:{
-   labels: dados.map((_,i)=>'Dia '+(i+1)),
-   datasets:[
-    {
-     label:'Ganhos',
-     data:dados
-    }
-   ]
+   labels: lista.map((_,i)=>'Dia '+(i+1)),
+   datasets:[{label:'Ganhos',data:lista}]
   }
  });
 }
 
-metaDia();
-atualizar();
+init();
 </script>
 
 </body>
